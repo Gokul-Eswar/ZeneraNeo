@@ -213,6 +213,11 @@ broad rather than wrong.
 
 ### Which of the two
 
+On request arrival, handoff or fork, use `memory_search` with the question or
+brief. Never use `memory_grep` as a generic first lookup or as a fallback after
+semantic search. Use it only when the retrieval target is a known literal and
+the answer requires exact presence or every occurrence.
+
 `memory_search` ranks, so it returns what is closest and stops. That makes it
 right for a question and wrong for a fact about the store itself - whether one
 exact name, path or command was ever written down. An empty search on a
