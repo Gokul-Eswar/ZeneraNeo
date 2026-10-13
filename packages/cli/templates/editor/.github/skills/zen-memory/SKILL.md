@@ -1,6 +1,6 @@
 ---
 name: zen-memory
-description: How agent memory is organised and how to configure it in `agents.yaml` - the `memory:` block, per-agent `access`/`sees`/`writes`/`autoRecall`, the five `memory_*` tools, kinds and relations, how recall ranks and stitches a subgraph, when an agent should reach for `memory_grep` instead of `memory_search`, how to inspect a graph with `zen memory search`/`grep`/`export`, and how to design a memory strategy for a project. Includes the default usage rules every memory-enabled project must carry in `agents/memory-instructions.md` (references/memory-instructions.md), the script that says whether that copy is still current (scripts/check-instructions.sh), where a project's own customisations go instead (`agents/memory-policy-instructions.md`, under `requires: [memory]`), what to commit and what never to, how to keep a working file under `/memory` and re-run it later, and how to put memory in front of a `zen rag schema` or `zen rag docs` index so a search that already succeeded once is not paid for again.
+description: How agent memory is organised and how to configure it in `agents.yaml` - the `memory:` block, per-agent `access`/`sees`/`writes`/`autoRecall`, the five `memory_*` tools, kinds and relations, how recall ranks and stitches a subgraph, when an agent should reach for `memory_grep` instead of `memory_search`, how to inspect a graph with `zen memory search`/`grep`/`export`, and how to design a memory strategy for a project. Includes the default usage rules every memory-enabled project must carry in `agents/memory-instructions.md` (written and kept current by `zen check --fix`), where a project's own customisations go instead (`agents/memory-policy-instructions.md`, under `requires: [memory]`), what to commit and what never to, how to keep a working file under `/memory` and re-run it later, and how to put memory in front of a `zen rag schema` or `zen rag docs` index so a search that already succeeded once is not paid for again.
 ---
 
 # Memory
@@ -142,8 +142,8 @@ node. It is house rules under `requires: [memory]`, so it reaches exactly the
 agents that have the store and no others, and it gates its own advice on the
 tools the reader actually holds. The runtime adds the preference block and
 nothing else. Do not restate any of it in a prompt; state project-specific
-policy instead, and keep the copy byte-identical to the reference so
-`check-instructions.sh` stays meaningful.
+policy instead, and leave the file exactly as `zen` wrote it - `zen check`
+reports any byte that differs as `rules.stale`.
 
 ## How it is organised
 
@@ -556,38 +556,20 @@ gets whether it loads the skill or not.
 
 ## The house rules
 
-**Every project that enables memory carries `references/memory-instructions.md`
-in its own `agents/memory-instructions.md`**, as part of turning memory on. That
-file is how the agent is told to use the store: read and search it only through
-the tools, never through `/memory` itself, and what a node must carry to still be
-worth having.
+**Every project that enables memory carries `agents/memory-instructions.md`**,
+as shipped by `zen`. That file is how the agent is told to use the store: read
+and search it only through the tools, never through `/memory` itself, and what a
+node must carry to still be worth having.
 
 `zen init` writes it, because the projects it scaffolds have memory on from the
-first run. Two cases are left to check by hand: a project that turned memory on
-afterwards, and one whose copy has drifted from the reference or was deleted.
+first run. `zen check` covers the two cases left over:
 
-Neither is checked by eye. The skill ships the check, and it is one command:
+- `memory.uninstructed` - memory is on and the file is missing or empty.
+- `rules.stale` - any byte differs from what this `zen` ships. The usual drift
+  is trailing whitespace inside a table, invisible on screen.
 
-```sh
-.github/skills/zen-memory/scripts/check-instructions.sh        # the verdict
-.github/skills/zen-memory/scripts/check-instructions.sh diff   # every differing line
-.github/skills/zen-memory/scripts/check-instructions.sh fix    # copy the reference over
-```
-
-It says whether this project turns memory on at all, exits non-zero on a copy
-that is missing or stale, and prints the `cp` that repairs it. When the only
-difference is trailing whitespace it says so - that is the usual drift, it is
-invisible on screen, and it is the reason reading the two files side by side
-never caught it.
-
-It is a copy, not a transcription - this reference already sits in the project,
-because `zen init` and `zen open` write the whole `.github/` tree, and they write
-it from the same file the project's copy came from. What `fix` runs, from the
-project root, is exactly:
-
-```sh
-cp .github/skills/zen-memory/references/memory-instructions.md agents/memory-instructions.md
-```
+`zen check --fix` repairs both, writing the file from the version of `zen` in
+hand. Never write or patch it by hand.
 
 Everything the project keeps under `agents/` named `<topic>-instructions.md` is
 prepended to every agent, in filename order, so this belongs in its own document
@@ -598,19 +580,55 @@ memory and it leaves with it.
 
 | File                                   | Is                                                                 | Owned by    |
 | -------------------------------------- | ------------------------------------------------------------------ | ----------- |
-| `agents/memory-instructions.md`        | the DEFAULT rules - how the store works, and how any agent uses it | this skill  |
+| `agents/memory-instructions.md`        | the DEFAULT rules - how the store works, and how any agent uses it | `zen`       |
 | `agents/memory-policy-instructions.md` | this PROJECT's customisations on top of them                       | the project |
 
-**Keep the first a pure copy.** It is predefined: it describes this version of
-the runtime, not this project, and `check-instructions.sh` compares it byte for
-byte. Anything edited into it is lost the next time the reference changes.
+### Keep project policy additive
+
+`agents/memory-policy-instructions.md` is not a second memory manual and is not
+the default destination for every memory finding. A rule belongs there only
+when it changes how **every memory-enabled agent in this project** uses memory
+and the default rules do not already say it.
+
+| The rule is about                                                   | Owner                                                   |
+| ------------------------------------------------------------------- | ------------------------------------------------------- |
+| How the memory tools and graph work in every Zenera project         | the upstream default; never repeat it in project policy |
+| A project-wide restriction or obligation for every memory agent     | `agents/memory-policy-instructions.md`                  |
+| One agent's job, finish condition, recall timing or commit behavior | that agent's prompt                                     |
+| One workflow, index, API or body of domain knowledge                | the skill that teaches that workflow or knowledge       |
+| One observed case with no repeated pattern yet                      | the tuning findings, not an instruction                 |
+
+Before adding or changing a project memory rule:
+
+1. Write the intended obligation in one sentence without naming a file.
+2. Choose its owner from the table above and name the agents that must receive
+   it. If that set is smaller than every memory-enabled agent, policy is the
+   wrong owner.
+3. Search the default memory rules, every project policy file, the affected
+   prompts and the affected skills for the obligation. Search distinctive
+   verbs and nouns plus obvious alternate wording; an exact-text search alone
+   does not find semantic duplicates.
+4. Record one disposition: `edit existing`, `move and delete`, `delete
+  contradiction`, or `add because absent`. An addition without this record is
+   not ready to apply.
+5. Make one source authoritative in the same change. Remove weaker copies and
+   rewrite a conflicting rule as one complete rule; never preserve the old rule
+   and append an exception beneath it.
+
+The narrowest source that reliably reaches every intended agent owns the rule.
+Several cases supporting one pattern do not make that pattern global; scope is
+decided by who must obey it, not by how often it failed.
+
+**Keep the first untouched.** It is predefined: it describes this version of
+the runtime, not this project, and `zen check` compares it byte for byte.
+Anything edited into it is lost the next time `zen check --fix` runs.
 
 Everything a project decides for itself goes in the second - audiences, what
 must never be written down, what an agent commits at the end of a job, which
 index a recalled route is checked against. Filename order puts it directly
 after the defaults, so it reads as the exceptions to them. Then keeping up with
-a changed reference is the same one command again, rather than a hand-patch
-around prose that has to be preserved.
+a newer `zen` is `zen check --fix` again, rather than a hand-patch around prose
+that has to be preserved.
 
 **It must open with the same frontmatter**, or it is prepended to every agent in
 the project, including the ones with no store to apply it to:
@@ -720,10 +738,17 @@ agents:
 
 ## Review checklist
 
-- [ ] `.github/skills/zen-memory/scripts/check-instructions.sh` exits zero, so
-      `agents/memory-instructions.md` is the reference byte for byte - and
+- [ ] `zen check` reports neither `memory.uninstructed` nor `rules.stale`, so
+      `agents/memory-instructions.md` is what `zen` ships byte for byte - and
       project policy lives in `agents/memory-policy-instructions.md`, opening
       with `requires: [memory]`.
+- [ ] Every project memory-policy rule applies to every memory-enabled agent;
+      role-specific rules are in prompts and workflow-specific rules are in
+      skills.
+- [ ] For every added or changed policy rule, the review records its one-sentence
+      obligation, owner, semantic searches, existing locations and disposition.
+- [ ] No project policy rule restates a default memory rule, and no equivalent
+      or softer copy remains in another loaded prompt, skill or policy file.
 - [ ] `memory.embedding` is set, and was set before the graph had content.
 - [ ] Every agent that should learn has a `memory:` binding - the top-level
       block alone enables nothing.

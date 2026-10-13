@@ -120,10 +120,8 @@ However small the diff:
 3. **§9 of the copilot instructions, worked as a checklist**, group by group.
 4. **The capability obligations in §0.1.** For every capability the project has
    turned on, load that capability's skill and re-check what it requires - in
-   particular that `agents/memory-instructions.md` is still byte-identical to
-   `.github/skills/zen-memory/references/memory-instructions.md`. `zen init` and
-   `zen open` rewrite the reference, so this drifts without anybody editing the
-   project.
+   particular that `zen check` reports no `rules.stale`: a newer `zen` ships
+   newer house rules, so they drift without anybody editing the project.
 5. **`zen-instructions` is loaded before any house rule is touched.** A pass
    whose scope reaches `agents/*instructions.md` - and input 4 puts it there
    whenever one of them moved - has to know that `tools-instructions.md`,

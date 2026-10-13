@@ -1,6 +1,5 @@
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { copyTree, MEMORY_RULES, TEMPLATES } from './host.ts';
+import { join } from 'node:path';
+import { copyTree, TEMPLATES } from './host.ts';
 
 // ---------------------------------------------------------------------------
 // Telling the editor which instructions are not for it
@@ -33,15 +32,6 @@ import { copyTree, MEMORY_RULES, TEMPLATES } from './host.ts';
 // editor picks up from the same place.
 // ---------------------------------------------------------------------------
 
-/** The same bytes, kept in the `zen-memory` skill to restore or diff against. */
-const MEMORY_REFERENCE = join(
-    '.github',
-    'skills',
-    'zen-memory',
-    'references',
-    'memory-instructions.md',
-);
-
 /**
  * Writes the editor's files under `dir`, replacing what is there. They are
  * ours: they say how the editor is to treat a directory the agents write into,
@@ -50,21 +40,5 @@ const MEMORY_REFERENCE = join(
  * none. Returns the relative paths written.
  */
 export function editorFiles(dir: string): string[] {
-    const written = copyTree(join(TEMPLATES, 'editor'), dir, '', {});
-
-    // The one file that belongs to both trees. It is a project file first —
-    // house rules reaching every agent that can see the graph — and it is
-    // written once and edited from then on, like every other project file. But
-    // a project whose copy drifted, or that deleted it and turned memory back
-    // on later, needs somewhere to get the current text from, and the editor
-    // tree is replaced on every `init` and `open`. Copying the same bytes into
-    // the skill's references is what makes `diff` between the two mean
-    // something, and what stops a second copy of these rules existing in the
-    // repository to fall out of step with the first.
-    const reference = join(dir, MEMORY_REFERENCE);
-    mkdirSync(dirname(reference), { recursive: true });
-    copyFileSync(join(TEMPLATES, 'project', MEMORY_RULES), reference);
-    written.push(MEMORY_REFERENCE);
-
-    return written;
+    return copyTree(join(TEMPLATES, 'editor'), dir, '', {});
 }

@@ -557,7 +557,7 @@ and why.
 | `agents/prompts/<name>.md`                          | no memory   | Yes — the usual place a per-agent finding lands                       |
 | `agents/skills/<name>/SKILL.md`                     | no memory   | Yes — when the fix is knowledge, not standing policy                  |
 | `agents/instructions.md`                            | no memory   | Yes — when the fix binds every agent in the project                   |
-| `agents/<topic>-policy-instructions.md`             | no memory   | Yes — new files are created here, one topic per file                  |
+| `agents/<topic>-policy-instructions.md`             | no memory   | Yes — edit the owner; create one only when the rule is absent         |
 | `agents/memory-policy-instructions.md`              | both        | Yes — what to commit without memory; recall and re-commit with it     |
 | the memory paragraph of a prompt or skill           | with memory | Only where an ask's `why` line names it                               |
 | `agents.yaml`                                       | —           | No — a structural finding is an open problem in the README            |
@@ -1224,10 +1224,11 @@ across proposals_. Two cases proposing the same sentence in different words are
 one pattern; two cases proposing opposite edits to one sentence are a conflict,
 and the conflict is the finding. Write the merged table into `findings.md`,
 under `## Proposals, merged`: one row per pattern, the cases and nodes behind
-it, the file, and the edit. A cost pattern becomes a rule the same way a
-correctness one does: three cases listing a directory to find a file the skill
-could name is a line in that skill; three cases running independent lookups in
-sequence is a fan-out rule in the prompt.
+it, the one-sentence obligation, intended audience, owner, existing locations,
+disposition, and edit. A cost pattern becomes a rule the same way a correctness
+one does: three cases listing a directory to find a file the skill could name
+is a line in that skill; three cases running independent lookups in sequence is
+a fan-out rule in the prompt.
 
 **One case is an anecdote.** A rule written from a single failure fixes that
 case and adds a line every other run has to read. Three cases missing the same
@@ -1266,6 +1267,30 @@ Prefer mechanical wording. "Put X before Y", "if the path does not end in `.py`,
 stop", "copy this literal verbatim" are followed. "Be thorough", "generalise
 appropriately" are followed about half the time and are not worth their tokens.
 
+### Prove the owner and the absence before editing
+
+Do this for every merged pattern, including memory patterns:
+
+1. State the behavioral obligation without using the wording of any proposed
+   rule.
+2. Name exactly which agents must obey it. Choose the narrowest source that
+   reliably reaches all of them: one agent's prompt, the workflow skill, a
+   capability policy, or the project-wide instructions.
+3. Search every source those agents load for the same obligation: house rules,
+   capability policies, their prompts, preloaded skills and relevant on-demand
+   skills. Search distinctive verbs and nouns and obvious alternate wording,
+   not only an exact quote. Use the assembled request from the inspected node
+   to settle which sources actually reached the failing call.
+4. Put every matching or conflicting location in the merged table and choose
+   exactly one disposition: `edit existing`, `move and delete`, `delete
+  contradiction`, or `add because absent`.
+
+An `add because absent` row is the only permission to append prose. If several
+sources express the obligation, consolidate them into the one owner and delete
+the others in the same round. If an existing broad rule caused the failure,
+rewrite or narrow it; do not leave it in place and add a case-specific
+exception elsewhere.
+
 ## Phase 6 — Apply (step 6)
 
 Route each rule by what kind of thing it is. When the pattern's `why` line
@@ -1274,22 +1299,32 @@ that file is where the change goes, whatever the table below would have
 guessed; find it the way **zen-analyze-run** finds its sources of trouble, by
 grepping the quote in the request and then in `agents.yaml` and `agents/`.
 
-| The finding is…                               | It goes in                                                                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------- |
-| One agent's behaviour, one agent's job        | `agents/prompts/<agent>.md`                                                  |
-| A fact, a format, an API shape, a procedure   | A skill — extend one, or create one                                          |
-| A standing rule every agent must obey         | `agents/instructions.md`                                                     |
-| A standing rule about one capability          | `agents/<topic>-policy-instructions.md` — new file                           |
-| The wrong agent had the tool, or no agent did | not changed — structural: an open problem in the README, reported at the end |
-| The dataset was wrong                         | `finetune/dataset.json`, before the next run                                 |
+| The finding is…                                          | It goes in                                                                                            |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| One agent's behaviour, one agent's job                   | `agents/prompts/<agent>.md`                                                                           |
+| A fact, a format, an API shape, a procedure              | A skill — extend one, or create one                                                                   |
+| A standing rule every agent must obey                    | `agents/instructions.md`                                                                              |
+| A project-wide rule every user of a capability must obey | its existing `agents/<topic>-policy-instructions.md`, or a new one only when the obligation is absent |
+| The wrong agent had the tool, or no agent did            | not changed — structural: an open problem in the README, reported at the end                          |
+| The dataset was wrong                                    | `finetune/dataset.json`, before the next run                                                          |
 
-New policy files are the usual output of a first batch: `memory-policy-`,
-`fork-policy-`, `tools-policy-`, `files-policy-instructions.md`. They sit beside
-`zen`'s own four, they are yours, and `zen check --fix` does not touch them. Load
-**zen-instructions** before writing one — in particular: `requires:` is _not_
-inherited, so a policy file must repeat the condition of the file it sits next to
-(`requires: memory` beside `memory-instructions.md`), and the files are prepended
-in filename order, so `memory-policy-` reads after `memory-instructions.md`.
+Policy files are a last destination, not the usual output of a batch. Create
+`memory-policy-`, `fork-policy-`, `tools-policy-` or
+`files-policy-instructions.md` only when the merged table proves the rule is
+absent and every agent with that capability must obey it. They sit beside
+`zen`'s own four, they are yours, and `zen check --fix` does not touch them.
+Load **zen-instructions** before writing one — in particular: `requires:` is
+_not_ inherited, so a policy file must repeat the condition of the file it sits
+next to (`requires: memory` beside `memory-instructions.md`), and the files are
+prepended in filename order, so `memory-policy-` reads after
+`memory-instructions.md`.
+
+Apply the disposition from the merged table. Prefer editing an existing owner;
+when moving a rule, add it to the owner and delete every displaced copy in the
+same change. Do not keep a general rule and stack narrower exceptions under it.
+Before finishing, search again for the obligation's terms and read the affected
+assembled prefix in order. The remaining copies must either have different
+audiences or be deleted.
 
 Never edit `agents/memory-instructions.md`, `agents/fork-instructions.md`,
 `agents/tools-instructions.md` or `agents/files-instructions.md`. They are copies
@@ -1299,10 +1334,11 @@ change the master upstream in the CLI templates, and note it in the run.
 
 Record what changed and why in the run's own `changes.md` —
 `finetune/runs/batch01-nomem-run1/changes.md` — one entry per edit, each
-naming the merged pattern and the proposals behind it. It is what makes the next
-run's difference interpretable, and it is what you read when a number goes
-_down_. `next.mjs` looks for it to tell whether a graded run is waiting to be
-confirmed.
+naming the merged pattern and the proposals behind it. Include the obligation,
+owner, searches, existing locations, disposition, rules removed or replaced,
+and the net line change. It is what makes the next run's difference
+interpretable, and it is what you read when a number goes _down_. `next.mjs`
+looks for it to tell whether a graded run is waiting to be confirmed.
 
 Then:
 
@@ -1519,12 +1555,14 @@ Then the per-case grading, each case ending in its proposals, as in phase 4.
 ### Merge, update the memory policy, run again (steps 12–14)
 
 Merge the proposals into patterns exactly as in phase 5, and write the merged
-table under `## Proposals, merged`. Then apply them — to
-`agents/memory-policy-instructions.md`, or to the memory paragraph of a prompt
-or skill where an ask's `why` line names one: rules about _when_ to recall, when
-to trust a recalled fact, when to go and look anyway, and when **not** to
-commit because memory already holds it. Record them in this run's `changes.md`
-and run `zen check`.
+table under `## Proposals, merged`. Run the phase 5 ownership and duplicate
+check before applying anything. Apply a project-wide rule to
+`agents/memory-policy-instructions.md` only when every memory-enabled agent must
+obey it; apply one agent's behavior to its prompt and one workflow's behavior to
+its skill. These rules cover _when_ to recall, when to trust a recalled fact,
+when to go and look anyway, and when **not** to commit because memory already
+holds it. Edit or consolidate an existing rule before adding one. Record the
+disposition and removals in this run's `changes.md`, then run `zen check`.
 
 A pattern that cannot be written as one of those is a no-memory finding that
 escaped: the with-memory runs do not fix it. Write it under "Open problems" in
@@ -1730,8 +1768,11 @@ next one. Change them upstream, in the CLI's `templates/editor/.github/skills/`.
     case is tuned against unless the user named a smaller limit.
 13. **Patch the README after every step, by hand.** Exactly one `now` node on the
     map. When `next.mjs` says `first: patch finetune/README.md`, do that first.
-14. **Never edit from one case's proposal.** Merge every case's proposals first;
-    a rule needs a pattern, unless the failure was catastrophic.
+14. **Never edit from one case's proposal, and never apply a pattern by merely
+    appending prose.** Merge every case's proposals first; then prove the owner,
+    search loaded sources for semantic duplicates, and record `edit existing`,
+    `move and delete`, `delete contradiction`, or `add because absent`. A rule
+    needs a pattern unless the failure was catastrophic.
 15. **Never edit `zen`'s four instruction files.** `zen check --fix` overwrites
     them. Project policy goes in a `-policy-` file beside them.
 16. **Never adjust a rubric after seeing the run.** Fix a wrong rubric before the

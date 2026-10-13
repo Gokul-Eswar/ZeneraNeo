@@ -37,8 +37,6 @@ const TEMPLATE = fileURLToPath(
     new URL('../templates/project/agents/memory-instructions.md', import.meta.url),
 );
 
-const REFERENCE = join('.github', 'skills', 'zen-memory', 'references', 'memory-instructions.md');
-
 const rules = readFileSync(TEMPLATE, 'utf8');
 
 const TOOLS = [
@@ -61,7 +59,9 @@ describe('the tools the house rules name', () => {
     });
 
     it('gate writing on having the tool, since the file is read by agents that cannot', () => {
-        const gate = rules.slice(0, rules.indexOf('## What belongs in it'));
+        const end = rules.indexOf('## Read');
+        expect(end).toBeGreaterThan(0);
+        const gate = rules.slice(0, end);
         expect(gate).toContain(MEMORY_COMMIT_TOOL);
         expect(gate).toContain(MEMORY_FORGET_TOOL);
     });
@@ -191,13 +191,12 @@ describe('the copies a scaffold leaves behind', () => {
         }
     });
 
-    it('are byte-identical to the template and to each other', () => {
+    it('are byte-identical to the template', () => {
         const dir = mkdtempSync(join(tmpdir(), 'zen-mem-rules-'));
         dirs.push(dir);
         scaffold({ dir, model: 'openai:gpt-5', embedding: 'openai:text-embedding-3-small' });
 
         expect(readFileSync(join(dir, 'agents', 'memory-instructions.md'), 'utf8')).toBe(rules);
-        expect(readFileSync(join(dir, REFERENCE), 'utf8')).toBe(rules);
     });
 
     // `requires: [memory]` is only worth writing if the scaffolded agent still
@@ -249,7 +248,6 @@ describe('the copies a scaffold leaves behind', () => {
         const written = refreshShared(dir);
 
         expect(written.slice(0, SHARED_RULES.length)).toEqual([...SHARED_RULES]);
-        expect(written).toContain(REFERENCE);
         expect(readFileSync(join(dir, 'agents', 'memory-instructions.md'), 'utf8')).toBe(rules);
         expect(readFileSync(join(dir, 'agents', 'tools-instructions.md'), 'utf8')).not.toBe(
             'drifted\n',

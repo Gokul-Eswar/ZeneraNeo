@@ -28,7 +28,6 @@ import { editorFiles } from './meta/editor.ts';
 //
 // The trees are copied whole and nothing enumerates them, so adding a file to
 // a new project is adding a file to `templates/project/` and nothing else.
-// `MEMORY_RULES` is the single exception, and it is named below.
 //
 // What is there is deliberately close to empty: a template full of
 // commented-out options is a template nobody reads and everybody deletes. The
@@ -50,7 +49,7 @@ const TEMPLATE = '.tmpl';
 const FILE_RULES = join('agents', 'files-instructions.md');
 
 /** How to use the memory graph: a house rules file, landing under `agents/`. */
-export const MEMORY_RULES = join('agents', 'memory-instructions.md');
+const MEMORY_RULES = join('agents', 'memory-instructions.md');
 
 /** How tools are called: the same, and equally not the project's to maintain. */
 const TOOL_RULES = join('agents', 'tools-instructions.md');

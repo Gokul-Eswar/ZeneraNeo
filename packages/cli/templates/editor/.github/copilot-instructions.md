@@ -113,29 +113,20 @@ tool access; give tool-based RAG users the configured RAG tools instead. Run
 `zen check` after adding or changing the skill.
 
 Memory has one such obligation and it is absolute: **a project with a `memory:`
-block carries the `zen-memory` skill's `references/memory-instructions.md` in its
-own `agents/memory-instructions.md`.** `zen init` writes both, since it scaffolds
-memory on; what needs watching is a project that deleted the file, or one whose
-copy has fallen behind the reference. Do not read the two files against each
-other - they drift by trailing whitespace inside tables, which is invisible.
-The skill ships the check:
-
-```sh
-.github/skills/zen-memory/scripts/check-instructions.sh       # the verdict
-.github/skills/zen-memory/scripts/check-instructions.sh fix   # copy the reference over
-```
-
-It is a copy, never a transcription - the reference ships inside the project,
-because `zen init` and `zen open` write this whole `.github/` tree, so `fix` is
-just `cp` from one to the other.
+block carries `agents/memory-instructions.md` exactly as `zen` ships it.**
+`zen init` writes it, since it scaffolds memory on; what needs watching is a
+project that deleted the file, or one whose copy has fallen behind. `zen check`
+reports the first as `memory.uninstructed` and the second as `rules.stale` -
+by bytes, so trailing whitespace inside a table, invisible on screen, is caught
+too - and `zen check --fix` repairs both.
 
 Nothing else tells a running agent how the store works, so without it nothing
 forbids an agent from pointing `grep` or `cat` at `/memory` - a read that
-bypasses the audience mask and serves superseded nodes as current. Keep the copy
-byte-identical and put this project's own memory policy in a second topic file,
-`agents/memory-policy-instructions.md`, which is read straight after it: then the
-copy can be re-run after any `zen init` or `zen open` refreshes the reference,
-without losing anything. Never paraphrase the reference into prose of your own.
+bypasses the audience mask and serves superseded nodes as current. Leave the
+file untouched and put this project's own memory policy in a second topic file,
+`agents/memory-policy-instructions.md`, which is read straight after it: then
+`zen check --fix` can replace the first after any upgrade without losing
+anything. Never paraphrase it into prose of your own.
 See §5.3.
 
 A project with a `SPECIFICATION.md` carries one more: **`.spec-sync/` records
@@ -1334,13 +1325,11 @@ derived from `access` and are never listed in `tools:`.
 
 **Memory comes on.** `zen init` writes the block above, `memory: true` on the
 default agent, and the half nobody would guess was part of it:
-`agents/memory-instructions.md`, a copy of the `zen-memory` skill's
-`references/memory-instructions.md`, which the project already holds. Adding
-memory to a project that has none is both of those edits, and a copy that was
-lost or went stale is one command:
+`agents/memory-instructions.md`. Adding memory to a project that has none is
+both of those edits, and a file that was lost or went stale is one command:
 
 ```sh
-.github/skills/zen-memory/scripts/check-instructions.sh fix
+zen check --fix
 ```
 
 It is what tells the agent that the store is reached only through the tools, that
@@ -1352,19 +1341,17 @@ what a node must carry to be worth having, and that a correction is a
 with it - and it carries `requires: [memory]`, so an agent without the store
 never reads a word of it.
 
-**Leave that file as a pure copy.** Anything this project decides for itself -
+**Leave that file untouched.** Anything this project decides for itself -
 which audience holds what, what must never be written down, what an agent is
 expected to commit at the end of a job - goes in
 `agents/memory-policy-instructions.md`. Topic files are read in filename order,
-so the policy lands directly after the rules it qualifies, and the copy stays
-re-runnable: the reference is rewritten by every `zen init` and `zen open`, and
-keeping up with it is then the same one-line command rather than a hand-patch.
+so the policy lands directly after the rules it qualifies, and the file stays
+replaceable: keeping up with a newer `zen` is then `zen check --fix` rather
+than a hand-patch.
 
-`zen check` validates the `memory:` block and says nothing about the rules'
-absence, so this is checked every time, by
-`.github/skills/zen-memory/scripts/check-instructions.sh` and never by reading
-the two files against each other: they drift by trailing whitespace inside a
-table, and the script is what can see that.
+`zen check` reports a missing file as `memory.uninstructed` and any differing
+byte as `rules.stale`. Never compare the file by eye: it drifts by trailing
+whitespace inside a table, and only a byte comparison sees that.
 
 Do not treat memory as a database. It is for things learned that should
 persist. Anything authoritative - a rate, a policy clause, a procedure - belongs
@@ -1865,8 +1852,8 @@ ok, `1` failed, `2` usage, `3` invalid project, `4` no usable credential.
 
 ## 9. Review checklist
 
-Four of these are decidable, and are one command - `zen check`, the path sweep,
-the memory copy, the spec-sync record, in that order:
+Three of these are decidable, and are one command - `zen check`, the path sweep,
+the spec-sync record, in that order:
 
 ```sh
 .github/skills/zen-review/scripts/review.sh
@@ -1905,10 +1892,9 @@ Before finishing any change here:
 - [ ] Failure paths stated for every instruction that can fail
 - [ ] No facts, rates or figures embedded in a prompt
 - [ ] No hedging, no meta-talk about the runtime
-- [ ] If any agent has `memory:`,
-      `.github/skills/zen-memory/scripts/check-instructions.sh` exits zero -
-      `agents/memory-instructions.md` is the reference byte for byte - and
-      anything project-specific is in `agents/memory-policy-instructions.md` - §5.3
+- [ ] If any agent has `memory:`, `zen check` reports neither
+      `memory.uninstructed` nor `rules.stale` - and anything project-specific
+      is in `agents/memory-policy-instructions.md` - §5.3
 
 **Paths (§2.5 - `.github/skills/zen-review/scripts/check-paths.sh` finds the
 candidates; these are the judgements to make about each one)**
@@ -2044,10 +2030,10 @@ candidates; these are the judgements to make about each one)**
   the turn that follows it - §2.5.
 - **Arithmetic in prose.** A skill that walks the model through a calculation it
   will get wrong, in a folder that could have held the script - §3.4.1.
-- **The unguarded store.** `memory:` turned on and the skill's
-  `references/memory-instructions.md` never copied to
+- **The unguarded store.** `memory:` turned on and no
   `agents/memory-instructions.md`, so nothing tells the agent the store is
-  reached only through the tools - and `zen check` passes throughout - §5.3.
+  reached only through the tools - `zen check` fails with
+  `memory.uninstructed`, and `zen check --fix` writes it - §5.3.
 - **Reviewing a capability without its skill.** A project whose memory, index or
   sandbox was configured by an earlier pass looks finished because it loads. The
   obligations are in the editor skill, not in `agents.yaml` - §0.1.

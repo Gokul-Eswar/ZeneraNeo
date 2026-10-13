@@ -185,7 +185,7 @@ open something, and a running agent sees four: `/workspace`, `/assets`,
 
 It reads `agents/*instructions.md` and exits `1` on any candidate.
 `agents/memory-instructions.md` is exempt: it is worked examples by design, and
-`check-instructions.sh` is the check it actually needs.
+`rules.stale` is the check it actually needs.
 
 ## What `zen check` reports
 
@@ -210,17 +210,9 @@ is quietly a project whose agents were never told how to call a tool. And
 `rules.unreached` deliberately never fires for ours, because they land in every
 project whether the capability is used or not.
 
-The memory copy has a check of its own, byte for byte, because the two files
-drift by trailing whitespace inside tables and that is invisible on screen:
-
-```sh
-.github/skills/zen-memory/scripts/check-instructions.sh        # the verdict
-.github/skills/zen-memory/scripts/check-instructions.sh diff   # every differing line
-.github/skills/zen-memory/scripts/check-instructions.sh fix    # copy the reference over
-```
-
-Never read the two against each other by eye, and never paraphrase the reference
-into prose of your own.
+`rules.stale` compares bytes, so it catches the usual drift - trailing
+whitespace inside a table, invisible on screen. Never compare one of ours
+against anything by eye, and never paraphrase one into prose of your own.
 
 ## Related
 

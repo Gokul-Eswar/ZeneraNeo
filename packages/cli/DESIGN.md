@@ -1300,9 +1300,7 @@ is right for `agents.yaml`, the prompts, the specification and
 `agents/instructions.md` - the project's own house rules, whose template says
 "replace this with yours" - and wrong for the four that only restate how the
 runtime behaves. Before `--fix` there was no way to upgrade them except by
-hand, which is why `agents/memory-instructions.md` was also copied into the
-`zen-memory` skill's `references/`: somewhere to `diff` against. That copy is
-still written, and is now a second opinion rather than the only route back.
+hand.
 
 `agents/files-instructions.md`, `agents/fork-instructions.md` and
 `agents/memory-instructions.md` are copied into every project, using files,

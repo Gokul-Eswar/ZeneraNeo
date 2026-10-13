@@ -1,6 +1,6 @@
 ---
 name: zen-review
-description: Checking a project before committing - the four mechanical checks `/project-review` makes before any judgement (`zen check`, the §2.5 path sweep, the memory house-rules copy, the spec-sync record), what each one owns, what their exit codes mean, which findings hand off to `zen-instructions`, and what deliberately has no check because no tool can make it. Load before running `/project-review`, before saying a project is ready, and whenever a review finding needs verifying rather than restating.
+description: Checking a project before committing - the three mechanical checks `/project-review` makes before any judgement (`zen check`, the §2.5 path sweep, the spec-sync record), what each one owns, what their exit codes mean, which findings hand off to `zen-instructions`, and what deliberately has no check because no tool can make it. Load before running `/project-review`, before saying a project is ready, and whenever a review finding needs verifying rather than restating.
 ---
 
 # Reviewing a project
@@ -22,17 +22,16 @@ From the project root, or anywhere at all:
 .github/skills/zen-review/scripts/review.sh
 ```
 
-It runs four checks in the order a reviewer needs them and prints a summary:
+It runs three checks in the order a reviewer needs them and prints a summary:
 
 | Step        | Runs                                       | Owns                                         |
 | ----------- | ------------------------------------------ | -------------------------------------------- |
 | `zen check` | the CLI                                    | everything decidable about the configuration |
 | `paths`     | `zen-review/scripts/check-paths.sh`        | paths a running agent cannot open - §2.5     |
-| `memory`    | `zen-memory/scripts/check-instructions.sh` | the house-rules copy, byte for byte - §5.3   |
 | `spec-sync` | `zen-spec-sync/scripts/snapshot.sh status` | whether the record of the last pass is sound |
 
 Every step runs even when an earlier one fails, because a review that stops at
-the first problem is one somebody has to run four times. The exit code is `1` if
+the first problem is one somebody has to run three times. The exit code is `1` if
 any step wants attention and `0` if none does. `review.sh fast` passes
 `--no-models --no-sandbox` to `zen check`, which is the right call while
 iterating and the wrong one before committing - a key that authenticates says
@@ -41,7 +40,7 @@ nothing about the model id it is spent on.
 Nothing below matters while `zen check` fails. Report what it said and fix that
 first.
 
-## The two scripts this skill ships
+## The script this skill ships
 
 ### `check-paths.sh` - the §2.5 sweep
 
@@ -60,9 +59,8 @@ It exits `1` whenever it prints a candidate, because the list is meant to be
 emptied or explained rather than skimmed. It strips urls before tokenising, skips
 a handful of English constructions that contain a slash, and leaves the four
 copies `zen` ships (`agents/{files,fork,memory,tools}-instructions.md`) out
-entirely - they are worked examples by design, `zen check` keeps them
-byte-identical (`rules.stale`), and `check-instructions.sh` is the check memory
-actually needs.
+entirely - they are worked examples by design, and `zen check` keeps them
+byte-identical (`rules.stale`).
 
 Everything it does print is either noise the script has not learned yet or a
 real finding. There is no third case. A candidate that is genuinely noise is a
@@ -70,29 +68,6 @@ one-line addition to `NOISE` in the script - **upstream**, see below, not in the
 copy sitting in this project.
 
 `raw` is the sweep with nothing filtered, for when you suspect the filter.
-
-### `check-instructions.sh` - the memory house rules
-
-Lives in the `zen-memory` skill, because it is about memory and it is read at
-the moment that skill is:
-
-```sh
-.github/skills/zen-memory/scripts/check-instructions.sh        # the verdict
-.github/skills/zen-memory/scripts/check-instructions.sh diff   # and every differing line
-.github/skills/zen-memory/scripts/check-instructions.sh fix    # copy the reference over
-```
-
-`agents/memory-instructions.md` must be a byte-identical copy of the `zen-memory`
-skill's `references/memory-instructions.md`, and the reference is rewritten by
-every `zen init` and `zen open`, so the copy goes stale without anyone touching
-it. It drifts by **trailing whitespace inside tables**, which is invisible on
-screen - this is the check no one should be asked to make by eye. When the
-difference is whitespace alone the script says so, because that is the usual
-cause and the least believable finding.
-
-`fix` is the one-line `cp` and nothing else. Project policy belongs in
-`agents/memory-policy-instructions.md`, which filename order puts directly after
-the copy - see the `zen-memory` skill.
 
 ## Findings that are not yours to fix in place
 

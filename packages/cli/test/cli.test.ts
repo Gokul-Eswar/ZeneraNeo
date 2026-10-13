@@ -2088,10 +2088,9 @@ describe('the scaffold', () => {
         const written = scaffold({ dir, model: 'gpt-4o' });
         const entry = join('.github', 'skills', 'zen-review', 'scripts', 'review.sh');
         const paths = join('.github', 'skills', 'zen-review', 'scripts', 'check-paths.sh');
-        const memory = join('.github', 'skills', 'zen-memory', 'scripts', 'check-instructions.sh');
 
         expect(written.editor).toContain(join('.github', 'skills', 'zen-review', 'SKILL.md'));
-        for (const script of [entry, paths, memory]) {
+        for (const script of [entry, paths]) {
             expect(written.editor).toContain(script);
             expect(statSync(join(dir, script)).mode & 0o777).toBe(0o755);
         }
@@ -2105,7 +2104,6 @@ describe('the scaffold', () => {
 
         // A project as `zen init` leaves it has nothing to report.
         expect(run(paths).status).toBe(0);
-        expect(run(memory).stdout).toContain('byte for byte');
 
         // A path outside the four mounts is a finding, and says where it is.
         writeFileSync(join(dir, 'agents', 'prompts', 'default.md'), 'Read /tmp/x.txt first.\n');
@@ -2113,46 +2111,6 @@ describe('the scaffold', () => {
         expect(swept.status).toBe(1);
         expect(swept.stdout).toContain('path: /tmp/x.txt');
         expect(swept.stdout).toContain('agents/prompts/default.md:1');
-    });
-
-    /**
-     * The drift this exists for: a copy that differs from the reference by
-     * trailing whitespace inside a table, which nobody has ever caught by
-     * reading the two files side by side.
-     */
-    it('catches a memory copy that drifted invisibly, and repairs it', () => {
-        const dir = join(root, 'memory-copy');
-        mkdirSync(dir, { recursive: true });
-        scaffold({ dir, model: 'gpt-4o' });
-        const script = join(
-            dir,
-            '.github',
-            'skills',
-            'zen-memory',
-            'scripts',
-            'check-instructions.sh',
-        );
-        const copy = join(dir, 'agents', 'memory-instructions.md');
-        const run = (...args: string[]) =>
-            spawnSync(script, args, { cwd: tmpdir(), encoding: 'utf8' });
-
-        const lines = readFileSync(copy, 'utf8').split('\n');
-        lines[0] = `${lines[0]}  `;
-        writeFileSync(copy, lines.join('\n'));
-
-        const drifted = run();
-        expect(drifted.status).toBe(1);
-        expect(drifted.stdout).toContain('trailing whitespace only');
-        expect(run('diff').stdout).toContain('--- reference');
-
-        expect(run('fix').status).toBe(0);
-        expect(run().status).toBe(0);
-
-        // Gone entirely is the other half of it, and the remedy is the same one.
-        rmSync(copy);
-        const missing = run();
-        expect(missing.status).toBe(1);
-        expect(missing.stdout).toContain('missing: agents/memory-instructions.md');
     });
 });
 

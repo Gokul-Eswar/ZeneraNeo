@@ -13,7 +13,7 @@ saying anything.
 .github/skills/zen-review/scripts/review.sh
 ```
 
-That is `zen check`, the §2.5 path sweep, the memory house-rules copy and the
+That is `zen check`, the §2.5 path sweep and the
 spec-sync record, in the order they matter. Load the `zen-review` skill for what
 each one owns and how to read its output. Do not re-verify by hand anything it
 already decided, and do not go further while `zen check` fails - nothing below

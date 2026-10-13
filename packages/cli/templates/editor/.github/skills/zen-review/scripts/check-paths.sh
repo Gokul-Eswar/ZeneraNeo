@@ -46,8 +46,7 @@ strip_urls() {
 # The four copies `zen` ships (files-, fork-, memory-, tools-instructions.md)
 # are left out on purpose. They are full of worked examples, so they fail this
 # sweep by design, and the project cannot edit them anyway: `zen check` reports
-# any byte that differs as `rules.stale`. Memory has a check of its own too:
-# .github/skills/zen-memory/scripts/check-instructions.sh
+# any byte that differs as `rules.stale`.
 files() {
     {
         if [ -d agents/prompts ]; then find agents/prompts -type f -name '*.md'; fi

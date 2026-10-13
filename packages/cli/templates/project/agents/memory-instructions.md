@@ -49,13 +49,17 @@ not complete node contents.
 ### Read recollections as graphs
 
 A `<memory-recollection>` is an outline of nodes and relations, not a ranked
-list. Root lines are semantic matches. Indented lines are connected nodes.
+list; the indentation is the graph. A root line reads `score kind id`; a root
+the walk reached without matching carries `--` instead of a score. An indented
+line is a connected node, prefixed by its relation: `→produced` means the line
+above produced it, `←informed` means it informed the line above.
 `PRODUCED`, `CALLS`, and `SUPERSEDES` form the reusable work; `INFORMED` adds
 background. A `+` reference points to an id already shown above.
 
-Node text is clipped to 160 characters. A file node also names its remembered
-file. Use `memory_load` to obtain the complete node and its usable `/memory/...`
-path. Touch only paths returned by a `memory_*` tool.
+Node text is clipped to 160 characters. A file node adds one line with its
+`/memory/<id>.<ext>` path, size, and use count. Use `memory_load` to obtain the
+complete node and its usable path. Touch only paths returned by a `memory_*`
+tool.
 
 Direct store access is prohibited because it bypasses audience controls, may
 serve superseded nodes, does not record use, and can race with another writer.

@@ -2,7 +2,7 @@
 #
 # Every check a review can make without judgement, in the order it makes them.
 #
-#   review.sh            zen check, then paths, memory, and the spec-sync record
+#   review.sh            zen check, then paths and the spec-sync record
 #   review.sh fast       the same, with `zen check --no-models --no-sandbox`
 #
 # What it prints is findings. What it cannot see — whether an agent has one job,
@@ -10,7 +10,7 @@
 # the rest of /project-review, and the reason that prompt still exists.
 #
 # Every step runs even when an earlier one fails: a review that stops at the
-# first problem is one somebody has to run four times. The exit code is 1 if
+# first problem is one somebody has to run three times. The exit code is 1 if
 # anything wants attention, 0 if nothing does.
 #
 # Run it from anywhere; it finds the project root from its own location.
@@ -58,7 +58,7 @@ if command -v zen >/dev/null 2>&1; then
         verdict 'zen check' "exit $rc — nothing below matters until this passes" 1
     fi
 else
-    echo "zen is not on PATH — install it, or run the other three alone"
+    echo "zen is not on PATH — install it, or run the other two alone"
     verdict 'zen check' 'not run' 1
 fi
 
@@ -69,15 +69,6 @@ if [ "$rc" -eq 0 ]; then
     verdict 'paths' 'ok' 0
 else
     verdict 'paths' 'candidates to explain or fix' 1
-fi
-
-step 'memory'
-"$SKILLS/zen-memory/scripts/check-instructions.sh"
-rc=$?
-if [ "$rc" -eq 0 ]; then
-    verdict 'memory' 'ok' 0
-else
-    verdict 'memory' 'the house rules are missing or stale' 1
 fi
 
 step 'spec-sync'
