@@ -489,7 +489,7 @@ export function probeChat(provider: string, id: string): Model {
  * accepted and the id was the thing refused, so the fix is another model rather
  * than another key. `dead` is left to mean the credential itself was rejected.
  */
-function classifyModel(err: unknown, target: ModelTarget): KeyCheck {
+function classifyModel(err: unknown, target: ModelTarget, ms: number): KeyCheck {
     const at = new Date().toISOString();
     const message = err instanceof Error ? err.message : String(err);
     const e = err as { status?: number; statusCode?: number; name?: string };
@@ -501,7 +501,25 @@ function classifyModel(err: unknown, target: ModelTarget): KeyCheck {
         return { state: 'blocked', at, detail: firstLine(message), fix: instead(target) };
     }
     const check = classify(err);
+    // classify() calls a 429 a live key; for a model it means nothing answered.
+    if (check.state === 'live') {
+        const said = (err as { detail?: unknown }).detail;
+        return {
+            state: 'unknown',
+            at,
+            detail: `rate limited after ${(ms / 1000).toFixed(1)}s of retries: ${typeof said === 'string' ? said : firstLine(message)}`,
+            fix: limited(target),
+        };
+    }
     return check.state === 'blocked' && !check.fix ? { ...check, fix: instead(target) } : check;
+}
+
+function limited(target: ModelTarget): string {
+    const blame = "the key and the model id are fine, the provider's rate limit is not";
+    if (target.ref.endsWith(':free')) {
+        return `${blame} — free models share a small upstream quota; retry later, or test the paid id: zen models test ${target.ref.slice(0, -':free'.length)}`;
+    }
+    return `${blame} — retry later`;
 }
 
 /** The command that finds something this account can actually use. */
@@ -553,7 +571,8 @@ export async function probeModel(target: ModelTarget): Promise<ModelProbe> {
             ...(dimensions === undefined ? {} : { dimensions }),
         };
     } catch (err) {
-        return { ...common, check: classifyModel(err, target), ms: Date.now() - started };
+        const ms = Date.now() - started;
+        return { ...common, check: classifyModel(err, target, ms), ms };
     }
 }
 

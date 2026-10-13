@@ -32,6 +32,7 @@ import {
     groupOf,
     loadCatalog,
     matches,
+    perMillion,
     type CatalogEntry,
 } from '../src/catalog.ts';
 import { ALIASES, COMMANDS, EXTERNAL, type External } from '../src/commands/index.ts';
@@ -1152,6 +1153,17 @@ describe('the prompt history', () => {
     });
 });
 
+describe('model prices', () => {
+    it('are shown per million tokens, the unit price lists use', () => {
+        expect(perMillion('0.0000025')).toBe('$2.50');
+        expect(perMillion('0.000000075')).toBe('$0.075');
+        expect(perMillion('0.0000001')).toBe('$0.10');
+        expect(perMillion('0')).toBe('free');
+        expect(perMillion('-1')).toBe('varies');
+        expect(perMillion(undefined)).toBe('');
+    });
+});
+
 describe('the model probe', () => {
     const served: Model = {
         id: 'gpt-stub',
@@ -1192,6 +1204,17 @@ describe('the model probe', () => {
         ]);
         expect(refused!.check.state).toBe('dead');
         expect(silent!.check.state).toBe('unknown');
+    });
+
+    // A 429 proves the key, not the model: nothing came back, so it is not `live`.
+    it('does not call a rate-limited model live', async () => {
+        const err = Object.assign(new Error('Provider returned error'), { statusCode: 429 });
+        const [probe] = await probeModels([
+            { ref: 'openrouter:google/gemma:free', kind: 'model', model: refuses(err) },
+        ]);
+        expect(probe!.check.state).toBe('unknown');
+        expect(probe!.check.detail).toContain('rate limited');
+        expect(probe!.check.fix).toContain('zen models test openrouter:google/gemma');
     });
 
     it('asks an embedder for a vector instead of a completion', async () => {

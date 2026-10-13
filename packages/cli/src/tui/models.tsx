@@ -22,6 +22,8 @@ import {
     byGroup,
     isPartner,
     matches,
+    perMillion,
+    type Balance,
     type Catalog,
     type CatalogEntry,
     type Role,
@@ -56,6 +58,8 @@ export interface BrowseOptions {
     initial?: Provider;
     theme?: string;
     load(provider: Provider, refresh: boolean): Promise<Catalog>;
+    /** what the account has left to spend, for providers that say */
+    balance?(provider: Provider): Promise<Balance | undefined>;
     test(entry: CatalogEntry): Promise<Verdict>;
 }
 
@@ -69,6 +73,27 @@ const thousands = (n: number | undefined): string =>
     n === undefined ? '' : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 
 const ms = (n: number): string => (n < 1000 ? `${n}ms` : `${(n / 1000).toFixed(1)}s`);
+
+const money = (n: number): string => {
+    const abs = Math.abs(n);
+    return `${n < 0 ? '-' : ''}$${abs !== 0 && abs < 0.01 ? abs.toFixed(4) : abs.toFixed(2)}`;
+};
+
+/** The balance as one line; `short` for the providers screen. */
+function account(b: Balance, short: boolean): string {
+    const parts: string[] = [];
+    if (b.credits !== undefined) {
+        parts.push(`balance ${money(b.credits)}`);
+    }
+    if (b.cap && !short) {
+        const reset = b.cap.reset ? ` ${b.cap.reset}` : '';
+        parts.push(`key cap ${money(b.cap.remaining)} left of ${money(b.cap.limit)}${reset}`);
+    }
+    if (b.free && !short) {
+        parts.push(`free ${b.free.remaining}/${b.free.limit} requests left today`);
+    }
+    return parts.join(' · ');
+}
 
 function freshness(origin: Catalog['origin'], fetchedAt: string): string {
     switch (origin) {
@@ -153,6 +178,7 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
     const [role, setRole] = useState(0);
     const [selected, setSelected] = useState(0);
     const [verdicts, setVerdicts] = useState<ReadonlyMap<string, Verdict | 'asking'>>(new Map());
+    const [balances, setBalances] = useState<ReadonlyMap<Provider, Balance | string>>(new Map());
     const [closing, setClosing] = useState(false);
     const top = useRef(0);
 
@@ -174,9 +200,21 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
         );
     };
 
+    const fetchBalance = (p: Provider): void => {
+        options.balance?.(p).then(
+            (b) => b && setBalances((prev) => new Map(prev).set(p, b)),
+            (err: unknown) => setBalances((prev) => new Map(prev).set(p, message(err))),
+        );
+    };
+
     useEffect(() => {
         if (start >= 0) {
             load(provider, false);
+        }
+        for (const p of options.providers) {
+            if (p.credential) {
+                fetchBalance(p.provider);
+            }
         }
         // Once, for `zen models browse <provider>`; every later open is a key.
     }, []);
@@ -244,7 +282,19 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
     // what is left. A row is kept in hand: a frame as tall as the viewport is
     // the one Ink cannot erase (see tui/app.tsx).
     const problem = catalog?.problem;
-    const chrome = 6 + (problem ? 1 : 0);
+    const balance = balances.get(provider);
+    const funds =
+        balance === undefined
+            ? []
+            : wrap(
+                  typeof balance === 'string'
+                      ? `balance could not be read: ${balance}`
+                      : account(balance, false) || 'balance: nothing reported',
+                  Math.max(20, size.columns - 1),
+              );
+    const short =
+        typeof balance === 'string' || (balance?.credits !== undefined && balance.credits <= 0);
+    const chrome = 7 + (problem ? 1 : 0) + funds.length;
     const height = Math.max(3, size.rows - 1 - chrome);
     top.current = scrollTop(index, top.current, height, rows.length);
 
@@ -345,6 +395,7 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
             pick(current);
         } else if (input === 'r') {
             load(provider, true);
+            fetchBalance(provider);
         } else if (key.escape && query) {
             setQuery('');
             setSelected(0);
@@ -378,6 +429,7 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
                     const fresh = cat
                         ? freshness(cat.origin, cat.fetchedAt)
                         : freshness(p.origin, p.fetchedAt);
+                    const b = balances.get(p.provider);
                     return (
                         <Row key={p.provider}>
                             <Text color={here ? theme.accent : undefined} bold={here}>
@@ -395,6 +447,9 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
                                 {`${count} model${count === 1 ? '' : 's'}`.padEnd(13)}
                                 {p.credential ? fresh : `zen key add ${p.provider}`}
                             </Text>
+                            {b && typeof b !== 'string' ? (
+                                <Text color={theme.code.color}>{`   ${account(b, true)}`}</Text>
+                            ) : null}
                         </Row>
                     );
                 })}
@@ -420,9 +475,28 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
     const header = catalog
         ? `${provider} · ${catalog.entries.length} models · ${freshness(catalog.origin, catalog.fetchedAt)}`
         : provider;
-    const idW = Math.min(44, Math.max(8, ...rows.map((e) => e.id.length))) + 2;
+    const withMaker = rows.some((e) => e.publisher);
+    const priced = rows.some((e) => e.pricing);
+    const ROLE_W = Math.max(4, ...rows.map((e) => e.roles.join('+').length)) + 2;
+    const CTX_W = 9;
+    const PRICE_W = 10;
+    const fixed =
+        (withMaker ? 12 : 0) + ROLE_W + CTX_W + (priced ? PRICE_W * 2 : 0) + 'test'.length + 2;
+    const idW = Math.max(
+        10,
+        Math.min(46, Math.max(8, ...rows.map((e) => e.id.length)) + 2, width - fixed),
+    );
     const shown = rows.slice(top.current, top.current + height);
     const filter = typing ? `/${query}▌` : query ? `/${query}` : '';
+    const columns = [
+        `  ${'model'.padEnd(idW)}`,
+        withMaker ? 'maker'.padEnd(12) : '',
+        'role'.padEnd(ROLE_W),
+        'context'.padStart(CTX_W - 2).padEnd(CTX_W),
+        priced ? 'in $/1M'.padStart(PRICE_W - 2).padEnd(PRICE_W) : '',
+        priced ? 'out $/1M'.padStart(PRICE_W - 2).padEnd(PRICE_W) : '',
+        'test',
+    ].join('');
 
     let body: React.JSX.Element;
     if (failure) {
@@ -447,16 +521,27 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
                                 {here ? '› ' : '  '}
                                 {clip(e.id, idW - 2).padEnd(idW)}
                             </Text>
-                            {e.publisher ? (
+                            {withMaker ? (
                                 <Text color={isPartner(e) ? theme.warn : theme.code.color}>
-                                    {clip(e.publisher, 11).padEnd(12)}
+                                    {clip(e.publisher ?? '', 11).padEnd(12)}
                                 </Text>
                             ) : null}
                             <Text color={theme.chrome.color}>
-                                {e.roles.join('+').padEnd(16)}
-                                {thousands(e.contextLength).padStart(6)}
-                                {(e.pricing?.free ? '  free' : '').padEnd(7)}
+                                {e.roles.join('+').padEnd(ROLE_W)}
+                                {thousands(e.contextLength)
+                                    .padStart(CTX_W - 2)
+                                    .padEnd(CTX_W)}
                             </Text>
+                            {priced ? (
+                                <Text color={e.pricing?.free ? theme.code.color : undefined}>
+                                    {perMillion(e.pricing?.prompt)
+                                        .padStart(PRICE_W - 2)
+                                        .padEnd(PRICE_W)}
+                                    {(e.pricing?.free ? '' : perMillion(e.pricing?.completion))
+                                        .padStart(PRICE_W - 2)
+                                        .padEnd(PRICE_W)}
+                                </Text>
+                            ) : null}
                             {v ? <Text color={v.color}>{v.text}</Text> : null}
                         </Row>
                     );
@@ -485,7 +570,15 @@ function Browser({ options, theme, onPick }: BrowserProps): React.JSX.Element | 
                     could not be listed: {problem.detail ?? 'no reason given'}
                 </Row>
             ) : null}
+            {funds.map((line, i) => (
+                <Row key={`funds${i}`} color={short ? theme.warn : theme.code.color}>
+                    {line}
+                </Row>
+            ))}
             <Text> </Text>
+            <Row bold color={theme.chrome.color}>
+                {columns}
+            </Row>
             <Box flexDirection="column" height={height}>
                 {body}
             </Box>
@@ -548,7 +641,7 @@ function Detail({ entry, catalog, verdict, theme, width, rows }: DetailProps): R
         entry.pricing?.free
             ? 'free'
             : entry.pricing?.prompt
-              ? `$${entry.pricing.prompt}/token in, $${entry.pricing.completion ?? '?'}/token out`
+              ? `${perMillion(entry.pricing.prompt)} per 1M input tokens, ${perMillion(entry.pricing.completion) || '?'} per 1M output tokens`
               : undefined,
     );
     add('released', entry.created);

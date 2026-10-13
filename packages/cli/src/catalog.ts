@@ -651,6 +651,89 @@ export async function loadCatalog(provider: Provider, opts: CatalogOptions = {})
     };
 }
 
+// ---------------------------------------------------------------------------
+// Prices and balance
+// ---------------------------------------------------------------------------
+
+/** A per-token USD price as dollars per million tokens, the unit price lists use. */
+export function perMillion(price: string | undefined): string {
+    if (price === undefined || price === '') {
+        return '';
+    }
+    const n = Number(price) * 1_000_000;
+    if (!Number.isFinite(n)) {
+        return '';
+    }
+    // OpenRouter prices its routers (`openrouter/auto`) as "-1": it depends on the pick.
+    if (n < 0) {
+        return 'varies';
+    }
+    if (n === 0) {
+        return 'free';
+    }
+    if (n >= 1) {
+        return `$${n.toFixed(2)}`;
+    }
+    // Two significant digits for fractions of a dollar, but never fewer than cents.
+    const short = String(Number(n.toPrecision(2)));
+    return `$${(short.split('.')[1]?.length ?? 0) < 2 ? n.toFixed(2) : short}`;
+}
+
+/** What an OpenRouter account has left to spend, as far as its key may see. */
+export interface Balance {
+    /** credits bought minus credits used; absent when the key may not read the account */
+    credits?: number;
+    /** the key's own spending cap, when one is set */
+    cap?: { limit: number; remaining: number; reset?: string };
+    /** requests to `:free` models left today */
+    free?: { used: number; limit: number; remaining: number };
+}
+
+interface RouterKey {
+    limit: number | null;
+    limit_remaining: number | null;
+    limit_reset: string | null;
+    free_model_daily_requests?: { used: number; limit: number; remaining: number };
+}
+
+export async function routerBalance(): Promise<Balance> {
+    const base = (process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1').replace(
+        /\/+$/,
+        '',
+    );
+    const get = async <T>(path: string): Promise<T> => {
+        const res = await fetch(`${base}${path}`, {
+            headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ''}` },
+            signal: AbortSignal.timeout(15_000),
+        });
+        if (!res.ok) {
+            throw Object.assign(new Error(`${path} answered ${res.status}`), {
+                status: res.status,
+            });
+        }
+        return ((await res.json()) as { data: T }).data;
+    };
+    // Raw rather than the SDK: its schema drops `free_model_daily_requests`.
+    const [key, credits] = await Promise.all([
+        get<RouterKey>('/key'),
+        // Documented as management-key only, though ordinary keys are answered too.
+        get<{ total_credits: number; total_usage: number }>('/credits').catch(() => undefined),
+    ]);
+    return {
+        ...(credits ? { credits: credits.total_credits - credits.total_usage } : {}),
+        ...(key.limit !== null && key.limit_remaining !== null
+            ? {
+                  cap: {
+                      limit: key.limit,
+                      remaining: key.limit_remaining,
+                      ...(key.limit_reset ? { reset: key.limit_reset } : {}),
+                  },
+              }
+            : {}),
+        ...(key.free_model_daily_requests ? { free: key.free_model_daily_requests } : {}),
+    };
+}
+
 /** Every provider asked at once — they are independent and mostly latency. */
 export async function loadCatalogs(
     providers: readonly Provider[],

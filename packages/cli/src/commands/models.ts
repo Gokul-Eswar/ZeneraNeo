@@ -23,6 +23,7 @@ import {
     loadCatalogs,
     matches,
     PREFERRED,
+    routerBalance,
     type Catalog,
     type CatalogEntry,
     type Filters,
@@ -798,6 +799,8 @@ const browse: Sub = async (ctx, args) => {
         initial,
         theme: values.theme,
         load: (provider, refresh) => loadCatalog(provider, { refresh: refresh || values.refresh }),
+        balance: async (provider) =>
+            provider === 'openrouter' && source(where, provider) ? routerBalance() : undefined,
         test: async (entry) => {
             const role: Role = entry.roles.includes('chat')
                 ? 'chat'
